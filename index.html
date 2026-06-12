@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Andon - Monitoraggio Linea</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;background:#1a1a2e;color:#eee;min-height:100vh}
+.header{background:linear-gradient(135deg,#16213e,#0f3460);padding:20px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #e94560;flex-wrap:wrap;gap:15px}
+.header h1{font-size:28px}.header h1 span{color:#e94560}
+.header .date-time{font-size:18px;color:#aaa}
+.controls{background:#16213e;padding:15px 30px;display:flex;align-items:center;gap:15px;flex-wrap:wrap;border-bottom:1px solid #0f3460}
+.controls label{font-size:14px;font-weight:600;color:#e94560}
+.controls select{padding:8px 15px;font-size:15px;border-radius:8px;border:2px solid #0f3460;background:#1a1a2e;color:#eee;cursor:pointer;min-width:160px}
+.controls select:focus{outline:none;border-color:#e94560}
+.controls .dot{width:10px;height:10px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:5px}
+.controls .dot.green{background:#4ecca3}.controls .dot.yellow{background:#f0a500}.controls .dot.red{background:#e94560}.controls .dot.blue{background:#33a0ff}
+.stats-bar{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:10px 20px;background:#16213e;border-bottom:1px solid #0f3460}
+@media(max-width:1000px){.stats-bar{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:600px){.stats-bar{grid-template-columns:1fr 1fr}}
+.stat-card{background:#1a1a2e;border-radius:8px;padding:8px 6px;text-align:center;border:1px solid #0f3460}
+.stat-card .label{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.5px}
+.stat-card .value{font-size:18px;font-weight:700;margin-top:2px}
+.stat-card .value.green{color:#4ecca3}.stat-card .value.yellow{color:#f0a500}.stat-card .value.blue{color:#33a0ff}.stat-card .value.red{color:#e94560}
+.main{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:20px 30px}
+@media(max-width:1000px){.main{grid-template-columns:1fr}}
+.sect{background:#16213e;border-radius:12px;padding:20px;border:1px solid #0f3460}
+.sect h2{font-size:17px;color:#e94560;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #0f3460}
+.sect h2 .cnt{color:#aaa;font-size:13px;font-weight:400}
+.timer-sect{grid-column:1/-1}
+.tbox{background:#1a1a2e;border-radius:12px;padding:25px;text-align:center;border:2px solid #0f3460;max-width:650px;margin:0 auto}
+.tbox.ok{border-color:#4ecca3}.tbox.over{border-color:#e94560;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 10px rgba(233,69,96,0.3)}50%{box-shadow:0 0 30px rgba(233,69,96,0.7)}}
+.tbox .pname{font-size:20px;font-weight:600;margin-bottom:6px}
+.tbox .pline{font-size:13px;color:#aaa;margin-bottom:12px}
+.tbox .time{font-size:48px;font-weight:700;font-family:'Courier New',monospace;letter-spacing:3px}
+.tbox .det{display:flex;justify-content:center;gap:20px;margin-top:12px;flex-wrap:wrap}
+.tbox .det>div{text-align:center}
+.tbox .det .lbl{font-size:10px;color:#888;text-transform:uppercase}
+.tbox .det .val{font-size:15px;font-weight:600}
+.barw{margin-top:10px;background:#0f3460;border-radius:10px;height:18px;overflow:hidden;position:relative;max-width:600px;margin-left:auto;margin-right:auto}
+.barf{height:100%;border-radius:10px;transition:width .5s ease;background:linear-gradient(90deg,#4ecca3,#33a0ff)}
+.barf.warn{background:linear-gradient(90deg,#f0a500,#e94560)}.barf.over{background:#e94560}
+.barl{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff}
+.list{max-height:400px;overflow-y:auto}
+.list::-webkit-scrollbar{width:6px}
+.list::-webkit-scrollbar-thumb{background:#0f3460;border-radius:3px}
+.item{display:grid;grid-template-columns:70px 1fr 80px;gap:8px;padding:10px 12px;background:#1a1a2e;border-radius:8px;margin-bottom:6px;align-items:center;border-left:4px solid #0f3460}
+.item .mac{font-weight:600;font-size:15px}
+.item .inf{font-size:12px;color:#ccc;line-height:1.4}
+.item .inf .verde{color:#4ecca3;font-weight:600}
+.item .inf .rosso{color:#e94560;font-weight:600}
+.item .badge{text-align:center;padding:3px 8px;border-radius:12px;font-size:10px;font-weight:600}
+.item .badge.done{background:rgba(78,204,163,0.2);color:#4ecca3}
+.item .badge.todo{background:rgba(51,160,255,0.2);color:#33a0ff}
+.item .badge.prog{background:rgba(240,165,0,0.2);color:#f0a500}
+.empty{text-align:center;padding:35px 20px;color:#666}
+.empty p{font-size:15px}
+.foot{padding:15px 30px;display:flex;justify-content:center;gap:12px}
+.foot button{padding:10px 25px;border:2px solid #0f3460;background:#16213e;color:#eee;border-radius:8px;font-size:13px;cursor:pointer}
+.foot button:hover{border-color:#e94560;background:#1a1a2e}
+.foot button.pri{background:#e94560;border-color:#e94560}
+.foot button.pri:hover{background:#c73650}
+.live{position:fixed;bottom:12px;right:12px;background:#16213e;padding:6px 12px;border-radius:20px;font-size:11px;color:#888;border:1px solid #0f3460;z-index:100}
+.live .dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;animation:blink 1s infinite}
+.live .dot.ok{background:#4ecca3}.live .dot.err{background:#e94560;animation:none}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.load{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(26,26,46,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000}
+.load .sp{width:45px;height:45px;border:4px solid #0f3460;border-top-color:#e94560;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load p{margin-top:18px;color:#aaa;font-size:15px}
+.errmsg{color:#e94560;text-align:center;padding:30px}
+.errmsg p{font-size:16px;margin-bottom:10px}
+</style>
+</head>
+<body>
+<div class="load" id="load"><div class="sp"></div><p>Caricamento da Supabase...</p></div>
+<div class="header">
+<h1>ANDON <span>●</span> Monitoraggio Linea</h1>
+<div class="date-time" id="clock">--</div>
+</div>
+<div class="controls">
+<label>Fase:</label>
+<select id="selFase">
+<option value="P1">Fase 1 (P1)</option>
+<option value="P2">Fase 2 (P2)</option>
+<option value="P3">Fase 3 (P3)</option>
+</select>
+<span id="status"><span class="dot green" id="sdot"></span> <span id="stxt">Caricamento...</span></span>
+</div>
+<div class="stats-bar">
+<div class="stat-card"><div class="label">Completati</div><div class="value green" id="sDone">0</div></div>
+<div class="stat-card"><div class="label">In corso</div><div class="value yellow" id="sProg">0</div></div>
+<div class="stat-card"><div class="label">Da fare</div><div class="value blue" id="sWait">0</div></div>
+<div class="stat-card"><div class="label">Rispetto tempi</div><div class="value" id="sTime">0%</div></div>
+<div class="stat-card"><div class="label">Carico lavoro</div><div class="value" id="sCarico" style="font-size:15px">--</div></div>
+<div class="stat-card"><div class="label">Tempo residuo</div><div class="value" id="sResiduo" style="font-size:14px">--</div></div>
+</div>
+<div class="main">
+<div class="sect timer-sect">
+<h2>Prodotto in Corso - Fase <span id="faseTitolo">P1</span></h2>
+<div class="tbox" id="tbox">
+<div class="pname" id="tpName">Nessun prodotto in corso</div>
+<div class="pline" id="tpInfo">-</div>
+<div class="time" id="tpTime">--:--:--</div>
+<div class="det">
+<div><div class="lbl">Inizio</div><div class="val" id="tpStart">--:--</div></div>
+<div><div class="lbl">Tc</div><div class="val" id="tpCycle">-- min</div></div>
+<div><div class="lbl">Fine prevista</div><div class="val" id="tpEnd">--:--</div></div>
+<div><div class="lbl">Delta</div><div class="val" id="tpDelta">--:--</div></div>
+</div>
+<div class="barw"><div class="barf" id="barFill" style="width:0%"></div><div class="barl" id="barLabel">0%</div></div>
+</div>
+</div>
+<div class="sect"><h2>Completati <span class="cnt" id="cDone">(0)</span></h2><div class="list" id="doneList"><div class="empty"><p>Nessun completato per questa fase</p></div></div></div>
+<div class="sect"><h2>Da fare <span class="cnt" id="cWait">(0)</span></h2><div class="list" id="waitList"><div class="empty"><p>Nessun da fare per questa fase</p></div></div></div>
+</div>
+<div class="foot">
+<button id="btnRefresh" class="pri">Ricarica</button>
+</div>
+<div class="live"><span class="dot ok" id="liveDot"></span><span id="liveLabel">Supabase</span></div>
+
+<script>
+// ===== SUPABASE CONFIG =====
+const SUPABASE_URL = 'https://hoceopmrrmoitzmslxvi.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvY2VvcG1ycm1vaXR6bXNseHZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExOTAwODMsImV4cCI6MjA5Njc2NjA4M30.KNNhLOZBIgriLyYYbzv5aFGC3r9JsCXpxT2_AIefwTw';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ===== UTILITIES =====
+let allRows=[],fase='P1',timerInt=null;
+function fd(d){return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear()}
+function ft(d){if(!d)return'--:--';return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+function ftf(d){if(!d)return'--:--:--';return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')}
+function fs(s){const h=Math.floor(Math.abs(s)/3600),m=Math.floor((Math.abs(s)%3600)/60),se=Math.floor(Math.abs(s)%60);return(s<0?'-':'')+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(se).padStart(2,'0')}
+function pDT(s){if(!s||!s.trim())return null;const p=s.split(' ');if(p.length!==2)return null;const d=p[0].split('/'),t=p[1].split(':');if(d.length!==3||t.length<2)return null;return new Date(parseInt(d[2]),parseInt(d[1])-1,parseInt(d[0]),parseInt(t[0]),parseInt(t[1]),t.length>2?parseInt(t[2]):0)}
+
+// ===== CALCOLO TEMPO LAVORATIVO =====
+const LAVORO_INIZIO_MATTINA=8*60,LAVORO_FINE_MATTINA=12*60,LAVORO_INIZIO_POMERIGGIO=13*60+30,LAVORO_FINE_POMERIGGIO=17*60+30;
+function minDelGiorno(d){return d.getHours()*60+d.getMinutes()}
+function minLavTra(inizio,fine){
+ if(!inizio||!fine)return null;
+ let tot=0,cur=new Date(inizio),end=new Date(fine);
+ while(cur<end){
+  const fineGiorno=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate(),23,59,59),fino=end<fineGiorno?end:fineGiorno;
+  const mCur=minDelGiorno(cur),mFino=minDelGiorno(fino);
+  let mInizioMatt=Math.max(mCur,LAVORO_INIZIO_MATTINA),mFineMatt=Math.min(mFino,LAVORO_FINE_MATTINA);
+  if(mInizioMatt<mFineMatt)tot+=mFineMatt-mInizioMatt;
+  let mInizioPom=Math.max(mCur,LAVORO_INIZIO_POMERIGGIO),mFinePom=Math.min(mFino,LAVORO_FINE_POMERIGGIO);
+  if(mInizioPom<mFinePom)tot+=mFinePom-mInizioPom;
+  cur=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate()+1,LAVORO_INIZIO_MATTINA/60,0,0);
+ }
+ return tot;
+}
+function minLavResiduiOggi(){const now=new Date(),mNow=minDelGiorno(now);let tot=0;if(mNow<LAVORO_FINE_MATTINA)tot+=Math.max(0,LAVORO_FINE_MATTINA-Math.max(mNow,LAVORO_INIZIO_MATTINA));if(mNow<LAVORO_FINE_POMERIGGIO)tot+=Math.max(0,LAVORO_FINE_POMERIGGIO-Math.max(mNow,LAVORO_INIZIO_POMERIGGIO));return tot;}
+
+// ===== DATI FASE =====
+function getFase(row,fase){
+ const idx={P1:1,P2:2,P3:3}[fase]||1;
+ const tc=[0,row.t1,row.t2,row.t3][idx];
+ const inizio=[null,row.d1,row.d2,row.d3][idx];
+ const fine=[null,row.e1,row.e2,row.e3][idx];
+ const ok=idx===1||(idx===2&&!!row.e1)||(idx===3&&!!row.e2);
+ let expectedStart=null;
+ if(idx===1)expectedStart=row.d1;
+ else if(idx===2&&row.e1)expectedStart=row.e1;
+ else if(idx===3&&row.e2)expectedStart=row.e2;
+ return{idx,tc,inizio,fine,ok,expectedStart};
+}
+function getStatus(row,fase){
+ const d=getFase(row,fase);
+ if(!d.ok)return{st:'noprereq',data:d};
+ if(d.tc===0)return{st:'skip',data:d};
+ if(d.fine)return{st:'done',data:d};
+ if(d.inizio&&!d.fine)return{st:'prog',data:d};
+ return{st:'wait',data:d};
+}
+
+// ===== LOAD DA SUPABASE =====
+async function load(){
+ try{
+  document.getElementById('load').style.display='flex';
+  const {data,error}=await supabase.from('planning').select('*').order('data_inizio').order('macchina');
+  if(error)throw error;
+  allRows=(data||[]).map(r=>({
+   data:r.data_inizio||'',macchina:r.macchina||'',
+   t1:r.tc_p1||0,t2:r.tc_p2||0,t3:r.tc_p3||0,
+   i1:r.inizio_p1||'',i2:r.inizio_p2||'',i3:r.inizio_p3||'',
+   f1:r.fine_p1||'',f2:r.fine_p2||'',f3:r.fine_p3||'',
+   d1:pDT(r.inizio_p1),d2:pDT(r.inizio_p2),d3:pDT(r.inizio_p3),
+   e1:pDT(r.fine_p1),e2:pDT(r.fine_p2),e3:pDT(r.fine_p3),
+  }));
+  document.getElementById('liveDot').className='dot ok';
+  document.getElementById('liveLabel').textContent='Supabase - '+allRows.length+' righe';
+  document.getElementById('selFase').onchange=()=>{fase=document.getElementById('selFase').value;aggiorna();};
+  aggiorna();
+  document.getElementById('load').style.display='none';
+ }catch(e){
+  document.getElementById('liveDot').className='dot err';
+  document.getElementById('liveLabel').textContent='ERRORE: '+e.message;
+  document.getElementById('load').innerHTML='<div class="errmsg"><p>Errore caricamento</p><p>'+e.message+'</p><p style="color:#888;font-size:12px;margin-top:10px">Verifica che la tabella "planning" esista su Supabase</p><button onclick="location.reload()" style="margin-top:15px;padding:10px 25px;background:#e94560;border:none;color:#fff;border-radius:8px;font-size:15px;cursor:pointer">Riprova</button></div>';
+ }
+}
+
+// ===== AGGIORNA =====
+function oggi(){const t=fd(new Date());return allRows.filter(r=>r.data===t)}
+function aggiorna(){
+ const rows=oggi();
+ document.getElementById('faseTitolo').textContent=fase;
+ const done=[],prog=[],wait=[];
+ rows.forEach(r=>{const s=getStatus(r,fase);if(s.st==='skip'||s.st==='noprereq')return;if(s.st==='done')done.push({row:r,data:s.data});else if(s.st==='prog')prog.push({row:r,data:s.data});else wait.push({row:r,data:s.data});});
+ document.getElementById('sDone').textContent=done.length;
+ document.getElementById('sProg').textContent=prog.length;
+ document.getElementById('sWait').textContent=wait.length;
+ let ok=0,tot=0;
+ done.forEach(({row,data})=>{if(data.tc>0&&data.inizio&&data.fine){tot++;const minEff=minLavTra(data.inizio,data.fine);if(minEff!==null&&minEff<=data.tc*1.1)ok++;}});
+ const elTime=document.getElementById('sTime');
+ if(elTime){elTime.textContent=tot>0?Math.round(ok/tot*100)+'%':'--';elTime.className='value '+(tot>0?(ok/tot>=0.8?'green':'red'):'');}
+ let caricoMin=0;
+ done.forEach(({row,data})=>{caricoMin+=data.tc;});prog.forEach(({row,data})=>{caricoMin+=data.tc;});wait.forEach(({row,data})=>{caricoMin+=data.tc;});
+ const caricoH=Math.floor(caricoMin/60),caricoM=caricoMin%60;
+ const elCarico=document.getElementById('sCarico');
+ if(elCarico)elCarico.textContent=caricoH+'h '+caricoM+'m ('+done.length+'/'+(done.length+prog.length+wait.length)+')';
+ const minRes=minLavResiduiOggi(),oreRes=Math.floor(minRes/60),minResR=minRes%60;
+ const minNecessari=prog.reduce((acc,{row,data})=>acc+Math.max(0,data.tc-(data.inizio?Math.max(0,(new Date()-data.inizio)/60000):0)),0)+wait.reduce((acc,{row,data})=>acc+data.tc,0);
+ const elRes=document.getElementById('sResiduo');
+ if(elRes){elRes.textContent=oreRes+'h '+minResR+'m';elRes.className='value '+(minRes>=minNecessari?'green':'red');elRes.title=(minRes>=minNecessari?'Tempo sufficiente: ':'TEMPO INSUFFICIENTE! Residui ')+oreRes+'h '+minResR+'m, necessari '+Math.floor(minNecessari/60)+'h '+minNecessari%60+'m';}
+ const sd=document.getElementById('sdot'),st=document.getElementById('stxt');
+ let html='<span class="dot ';
+ if(prog.length>0){sd.className='dot yellow';html+='yellow"></span> Fase '+fase+' - IN PRODUZIONE';}
+ else if(wait.length>0&&done.length>0){sd.className='dot blue';html+='blue"></span> Fase '+fase+' - '+done.length+' ok, '+wait.length+' da fare';}
+ else if(wait.length>0){sd.className='dot blue';html+='blue"></span> Fase '+fase+' - In attesa';}
+ else if(done.length>0){sd.className='dot green';html+='green"></span> Fase '+fase+' - Completata';}
+ else{sd.className='dot red';html+='red"></span> Fase '+fase+' - Nessun dato oggi';}
+ if(st)st.innerHTML=html;
+ aggiornaTimer(prog);renderDone(done);renderWait(wait);
+}
+
+// ===== TIMER =====
+function aggiornaTimer(prog){
+ if(timerInt){clearInterval(timerInt);timerInt=null;}
+ const box=document.getElementById('tbox'),pn=document.getElementById('tpName'),pi=document.getElementById('tpInfo'),pt=document.getElementById('tpTime'),ps=document.getElementById('tpStart'),pc=document.getElementById('tpCycle'),pe=document.getElementById('tpEnd'),pd=document.getElementById('tpDelta'),bf=document.getElementById('barFill'),bl=document.getElementById('barLabel');
+ if(!box||!pn)return;
+ if(prog.length===0){box.className='tbox';pn.textContent='Nessun prodotto in corso per Fase '+fase;if(pi)pi.textContent='-';if(pt)pt.textContent='--:--:--';if(ps)ps.textContent='--:--';if(pc)pc.textContent='-- min';if(pe)pe.textContent='--:--';if(pd)pd.textContent='--:--';if(bf){bf.style.width='0%';bf.className='barf';}if(bl)bl.textContent='0%';return;}
+ const {row,data}=prog[0];
+ if(pn)pn.textContent=row.macchina;if(pi)pi.textContent='Fase '+fase+' - Tc: '+data.tc+' min';
+ if(data.inizio&&ps&&pc&&pe&&pd&&bf&&bl){
+  const tc=data.tc,start=data.inizio,endExp=new Date(start.getTime()+tc*60000);
+  ps.textContent=ft(start);pc.textContent=tc+' min';pe.textContent=ft(endExp);
+  const tick=()=>{const now=new Date(),ela=(now-start)/1000,rem=(endExp-now)/1000,pct=Math.min(100,(ela/(tc*60))*100);pt.textContent=fs(ela);if(rem>=0){pd.textContent='-'+fs(rem);pd.style.color='#4ecca3';box.className='tbox ok';bf.className='barf'+(pct>85?' warn':'');}else{pd.textContent='+'+fs(-rem);pd.style.color='#e94560';box.className='tbox over';bf.className='barf over';}bf.style.width=pct+'%';bl.textContent=Math.round(pct)+'%';};
+  tick();timerInt=setInterval(tick,1000);
+ }
+}
+
+// ===== LISTE =====
+function renderDone(items){
+ const c=document.getElementById('doneList'),cnt=document.getElementById('cDone');
+ if(cnt)cnt.textContent='('+items.length+')';if(!c)return;
+ if(items.length===0){c.innerHTML='<div class="empty"><p>Nessun completato per Fase '+fase+'</p></div>';return;}
+ let h='';
+ items.forEach(({row,data})=>{let delta='',cls='',durata='';if(data.fine&&data.inizio){const minEff=minLavTra(data.inizio,data.fine);if(minEff!==null){const diff=minEff-data.tc;durata=' ('+Math.floor(minEff/60)+'h '+minEff%60+'m per '+data.tc+' min Tc)';if(diff>0){delta='+'+diff+"'";cls='rosso';}else{delta=diff+"'";cls='verde';}}}h+='<div class="item" style="border-left-color:#4ecca3"><div class="mac">'+row.macchina+'</div><div class="inf">Fase '+fase+' inizio '+ft(data.inizio)+' fine '+ft(data.fine)+durata+'<br>Delta: <span class="'+cls+'">'+delta+'</span></div><div class="badge done">OK</div></div>';});
+ c.innerHTML=h;
+}
+function renderWait(items){
+ const c=document.getElementById('waitList'),cnt=document.getElementById('cWait');
+ if(cnt)cnt.textContent='('+items.length+')';if(!c)return;
+ if(items.length===0){c.innerHTML='<div class="empty"><p>Nessun da fare per Fase '+fase+'</p></div>';return;}
+ let h='';
+ items.forEach(({row,data},i)=>{let extra='';if(data.expectedStart)extra=' atteso: '+ft(data.expectedStart);const badge=i===0?'prog':'todo';const label=i===0?'Prossimo':'In coda';h+='<div class="item"><div class="mac">'+row.macchina+'</div><div class="inf">Fase '+fase+' Tc:'+data.tc+' min'+extra+'</div><div class="badge '+badge+'">'+label+'</div></div>';});
+ c.innerHTML=h;
+}
+
+// ===== CLOCK =====
+function clock(){const n=new Date();const el=document.getElementById('clock');if(el)el.textContent=fd(n)+' '+ftf(n)}
+setInterval(clock,1000);clock();
+document.getElementById('btnRefresh').onclick=()=>load();
+load();
+setInterval(load,60000);
+</script>
+</body>
+</html>
