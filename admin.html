@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Andon - Gestione Dati</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;background:#1a1a2e;color:#eee;padding:30px;max-width:800px;margin:auto}
+h1{color:#e94560;border-bottom:2px solid #0f3460;padding-bottom:15px;margin-bottom:20px}
+.card{background:#16213e;border-radius:10px;padding:20px;margin:20px 0;border:1px solid #0f3460}
+textarea{width:100%;min-height:250px;background:#1a1a2e;color:#eee;border:1px solid #0f3460;border-radius:5px;padding:10px;font-family:monospace;font-size:13px;margin:10px 0}
+button{padding:12px 30px;background:#e94560;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;margin:5px}
+button:hover{background:#c73650}
+button.sec{background:#0f3460}
+button.sec:hover{background:#16213e}
+.log{background:#1a1a2e;border-radius:5px;padding:10px;font-family:monospace;font-size:13px;max-height:300px;overflow-y:auto;margin:15px 0}
+.log .ok{color:#4ecca3}.log .err{color:#e94560}.log .info{color:#33a0ff}
+.step{color:#f0a500;margin:8px 0;font-size:14px}
+.back{margin-top:20px;padding:10px 20px;background:#0f3460;color:#eee;border:none;border-radius:8px;font-size:14px;cursor:pointer;display:inline-block;text-decoration:none}
+.back:hover{background:#16213e}
+</style>
+</head>
+<body>
+<h1>ANDON — Gestione Dati</h1>
+
+<div class="card">
+<h3 style="color:#aaa;margin-bottom:10px">Passaggi per aggiornare i dati</h3>
+<div class="step">1️⃣ Apri planning.csv con Excel e modifica i dati</div>
+<div class="step">2️⃣ Copia tutto il contenuto del CSV (CTRL+A → CTRL+C)</div>
+<div class="step">3️⃣ Incolla qui sotto e clicca "Importa su Supabase"</div>
+</div>
+
+<div class="card">
+<textarea id="csvInput" placeholder="Incolla qui il contenuto del tuo planning.csv..."></textarea>
+<div>
+<button id="btnImport">🚀 Importa su Supabase</button>
+<button id="btnClear" class="sec">🗑️ Pulisci</button>
+</div>
+</div>
+
+<div class="card">
+<h3 style="color:#aaa;margin-bottom:10px">📋 Log Operazioni</h3>
+<div class="log" id="logOutput">
+<div class="info">Incolla il CSV e clicca Importa</div>
+</div>
+</div>
+
+<a href="https://andon.vercel.app" class="back">← Torna all'Andon</a>
+
+<script>
+const SUPABASE_URL = 'https://hoceopmrrmoitzmslxvi.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvY2VvcG1ycm1vaXR6bXNseHZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExOTAwODMsImV4cCI6MjA5Njc2NjA4M30.KNNhLOZBIgriLyYYbzv5aFGC3r9JsCXpxT2_AIefwTw';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const logEl = document.getElementById('logOutput');
+
+function log(msg, type = 'info') {
+ const d = document.createElement('div');
+ d.className = type;
+ d.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+ logEl.appendChild(d);
+ logEl.scrollTop = logEl.scrollHeight;
+}
+
+document.getElementById('btnImport').onclick = async () => {
+ const csvText = document.getElementById('csvInput').value.trim();
+ if (!csvText) { log('❌ Incolla il CSV prima di importare', 'err'); return; }
+
+ try {
+  // Parsing CSV
+  const lines = csvText.split('\n').filter(l => l.trim() !== '');
+  if (lines.length < 2) throw new Error('Il CSV deve avere almeno intestazione + 1 riga');
+  
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+   const vals = lines[i].split(';').map(v => v.trim());
+   if (vals.length < 5) continue;
+   rows.push({
+    data_inizio: vals[0] || '',
+    macchina: vals[1] || '',
+    tc_p1: parseInt(vals[2]) || 0,
+    tc_p2: parseInt(vals[3]) || 0,
+    tc_p3: parseInt(vals[4]) || 0,
+    inizio_p1: vals[5] || '',
+    inizio_p2: vals[6] || '',
+    inizio_p3: vals[7] || '',
+    fine_p1: vals[8] || '',
+    fine_p2: vals[9] || '',
+    fine_p3: vals[10] || '',
+   });
+  }
+
+  log('✅ Parsing completato: ' + rows.length + ' righe', 'ok');
+
+  // Cancella dati esistenti
+  log('🗑️ Cancello dati precedenti...', 'info');
+  await supabase.from('planning').delete().neq('id', 0);
+  
+  // Inserisce nuovi dati (batch da 50)
+  const BATCH = 50;
+  let total = 0;
+  for (let i = 0; i < rows.length; i += BATCH) {
+   const batch = rows.slice(i, i + BATCH);
+   const { error } = await supabase.from('planning').insert(batch);
+   if (error) throw error;
+   total += batch.length;
+   log('✅ Inserite ' + total + '/' + rows.length + ' righe', 'ok');
+  }
+  
+  log('🎉 IMPORT COMPLETATO! ' + total + ' righe su Supabase', 'ok');
+  log('🔄 Ricarica l\'Andon per vedere i dati', 'info');
+ } catch (err) {
+  log('❌ ERRORE: ' + err.message, 'err');
+ }
+};
+
+document.getElementById('btnClear').onclick = () => {
+ document.getElementById('csvInput').value = '';
+ logEl.innerHTML = '<div class="info">Log cancellato</div>';
+};
+</script>
+</body>
+</html>

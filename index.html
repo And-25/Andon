@@ -83,11 +83,7 @@ body{font-family:'Segoe UI',sans-serif;background:#1a1a2e;color:#eee;min-height:
 </div>
 <div class="controls">
 <label>Fase:</label>
-<select id="selFase">
-<option value="P1">Fase 1 (P1)</option>
-<option value="P2">Fase 2 (P2)</option>
-<option value="P3">Fase 3 (P3)</option>
-</select>
+<select id="selFase"><option value="P1">Fase 1 (P1)</option><option value="P2">Fase 2 (P2)</option><option value="P3">Fase 3 (P3)</option></select>
 <span id="status"><span class="dot green" id="sdot"></span> <span id="stxt">Caricamento...</span></span>
 </div>
 <div class="stats-bar">
@@ -102,8 +98,7 @@ body{font-family:'Segoe UI',sans-serif;background:#1a1a2e;color:#eee;min-height:
 <div class="sect timer-sect">
 <h2>Prodotto in Corso - Fase <span id="faseTitolo">P1</span></h2>
 <div class="tbox" id="tbox">
-<div class="pname" id="tpName">Nessun prodotto in corso</div>
-<div class="pline" id="tpInfo">-</div>
+<div class="pname" id="tpName">Nessun prodotto in corso</div><div class="pline" id="tpInfo">-</div>
 <div class="time" id="tpTime">--:--:--</div>
 <div class="det">
 <div><div class="lbl">Inizio</div><div class="val" id="tpStart">--:--</div></div>
@@ -112,166 +107,93 @@ body{font-family:'Segoe UI',sans-serif;background:#1a1a2e;color:#eee;min-height:
 <div><div class="lbl">Delta</div><div class="val" id="tpDelta">--:--</div></div>
 </div>
 <div class="barw"><div class="barf" id="barFill" style="width:0%"></div><div class="barl" id="barLabel">0%</div></div>
-</div>
-</div>
+</div></div>
 <div class="sect"><h2>Completati <span class="cnt" id="cDone">(0)</span></h2><div class="list" id="doneList"><div class="empty"><p>Nessun completato per questa fase</p></div></div></div>
 <div class="sect"><h2>Da fare <span class="cnt" id="cWait">(0)</span></h2><div class="list" id="waitList"><div class="empty"><p>Nessun da fare per questa fase</p></div></div></div>
 </div>
-<div class="foot">
-<button id="btnRefresh" class="pri">Ricarica</button>
-</div>
+<div class="foot"><button id="btnRefresh" class="pri">Ricarica</button></div>
 <div class="live"><span class="dot ok" id="liveDot"></span><span id="liveLabel">Supabase</span></div>
 
 <script>
-// ===== SUPABASE CONFIG =====
-const SUPABASE_URL = 'https://hoceopmrrmoitzmslxvi.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvY2VvcG1ycm1vaXR6bXNseHZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExOTAwODMsImV4cCI6MjA5Njc2NjA4M30.KNNhLOZBIgriLyYYbzv5aFGC3r9JsCXpxT2_AIefwTw';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// ===== UTILITIES =====
+const SUPABASE_URL='https://hoceopmrrmoitzmslxvi.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvY2VvcG1ycm1vaXR6bXNseHZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExOTAwODMsImV4cCI6MjA5Njc2NjA4M30.KNNhLOZBIgriLyYYbzv5aFGC3r9JsCXpxT2_AIefwTw';
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 let allRows=[],fase='P1',timerInt=null;
+
 function fd(d){return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear()}
 function ft(d){if(!d)return'--:--';return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
 function ftf(d){if(!d)return'--:--:--';return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')}
 function fs(s){const h=Math.floor(Math.abs(s)/3600),m=Math.floor((Math.abs(s)%3600)/60),se=Math.floor(Math.abs(s)%60);return(s<0?'-':'')+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(se).padStart(2,'0')}
 function pDT(s){if(!s||!s.trim())return null;const p=s.split(' ');if(p.length!==2)return null;const d=p[0].split('/'),t=p[1].split(':');if(d.length!==3||t.length<2)return null;return new Date(parseInt(d[2]),parseInt(d[1])-1,parseInt(d[0]),parseInt(t[0]),parseInt(t[1]),t.length>2?parseInt(t[2]):0)}
 
-// ===== CALCOLO TEMPO LAVORATIVO =====
-const LAVORO_INIZIO_MATTINA=8*60,LAVORO_FINE_MATTINA=12*60,LAVORO_INIZIO_POMERIGGIO=13*60+30,LAVORO_FINE_POMERIGGIO=17*60+30;
-function minDelGiorno(d){return d.getHours()*60+d.getMinutes()}
-function minLavTra(inizio,fine){
- if(!inizio||!fine)return null;
- let tot=0,cur=new Date(inizio),end=new Date(fine);
- while(cur<end){
-  const fineGiorno=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate(),23,59,59),fino=end<fineGiorno?end:fineGiorno;
-  const mCur=minDelGiorno(cur),mFino=minDelGiorno(fino);
-  let mInizioMatt=Math.max(mCur,LAVORO_INIZIO_MATTINA),mFineMatt=Math.min(mFino,LAVORO_FINE_MATTINA);
-  if(mInizioMatt<mFineMatt)tot+=mFineMatt-mInizioMatt;
-  let mInizioPom=Math.max(mCur,LAVORO_INIZIO_POMERIGGIO),mFinePom=Math.min(mFino,LAVORO_FINE_POMERIGGIO);
-  if(mInizioPom<mFinePom)tot+=mFinePom-mInizioPom;
-  cur=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate()+1,LAVORO_INIZIO_MATTINA/60,0,0);
- }
- return tot;
-}
-function minLavResiduiOggi(){const now=new Date(),mNow=minDelGiorno(now);let tot=0;if(mNow<LAVORO_FINE_MATTINA)tot+=Math.max(0,LAVORO_FINE_MATTINA-Math.max(mNow,LAVORO_INIZIO_MATTINA));if(mNow<LAVORO_FINE_POMERIGGIO)tot+=Math.max(0,LAVORO_FINE_POMERIGGIO-Math.max(mNow,LAVORO_INIZIO_POMERIGGIO));return tot;}
+function minLavResiduiOggi(){const n=new Date(),m=n.getHours()*60+n.getMinutes();let t=0;if(m<720)t+=Math.max(0,720-Math.max(m,480));if(m<1050)t+=Math.max(0,1050-Math.max(m,810));return t;}
+function minLavTra(a,b){if(!a||!b)return null;let t=0,c=new Date(a),e=new Date(b);while(c<e){const fg=new Date(c.getFullYear(),c.getMonth(),c.getDate(),23,59,59),f=e<fg?e:fg,mc=c.getHours()*60+c.getMinutes(),mf=f.getHours()*60+f.getMinutes();let x=Math.max(mc,480),y=Math.min(mf,720);if(x<y)t+=y-x;let w=Math.max(mc,810),z=Math.min(mf,1050);if(w<z)t+=z-w;c=new Date(c.getFullYear(),c.getMonth(),c.getDate()+1,8,0,0);}return t;}
 
-// ===== DATI FASE =====
-function getFase(row,fase){
- const idx={P1:1,P2:2,P3:3}[fase]||1;
- const tc=[0,row.t1,row.t2,row.t3][idx];
- const inizio=[null,row.d1,row.d2,row.d3][idx];
- const fine=[null,row.e1,row.e2,row.e3][idx];
- const ok=idx===1||(idx===2&&!!row.e1)||(idx===3&&!!row.e2);
- let expectedStart=null;
- if(idx===1)expectedStart=row.d1;
- else if(idx===2&&row.e1)expectedStart=row.e1;
- else if(idx===3&&row.e2)expectedStart=row.e2;
- return{idx,tc,inizio,fine,ok,expectedStart};
+function gf(row,fase){
+ const idx={P1:1,P2:2,P3:3}[fase]||1,tc=[0,row.t1,row.t2,row.t3][idx],inizio=[null,row.d1,row.d2,row.d3][idx],fine=[null,row.e1,row.e2,row.e3][idx];
+ const ok=idx===1||(idx===2&&!!row.e1)||(idx===3&&!!row.e2);let exp=null;
+ if(idx===1)exp=row.d1;else if(idx===2&&row.e1)exp=row.e1;else if(idx===3&&row.e2)exp=row.e2;
+ return{idx,tc,inizio,fine,ok,expectedStart:exp};
 }
-function getStatus(row,fase){
- const d=getFase(row,fase);
- if(!d.ok)return{st:'noprereq',data:d};
- if(d.tc===0)return{st:'skip',data:d};
- if(d.fine)return{st:'done',data:d};
- if(d.inizio&&!d.fine)return{st:'prog',data:d};
- return{st:'wait',data:d};
-}
+function gs(row,fase){const d=gf(row,fase);if(!d.ok)return{st:'noprereq',data:d};if(d.tc===0)return{st:'skip',data:d};if(d.fine)return{st:'done',data:d};if(d.inizio&&!d.fine)return{st:'prog',data:d};return{st:'wait',data:d};}
 
-// ===== LOAD DA SUPABASE =====
 async function load(){
  try{
   document.getElementById('load').style.display='flex';
-  const {data,error}=await supabase.from('planning').select('*').order('data_inizio').order('macchina');
+  const{data,error}=await sb.from('planning').select('*').order('data_inizio').order('macchina');
   if(error)throw error;
-  allRows=(data||[]).map(r=>({
-   data:r.data_inizio||'',macchina:r.macchina||'',
-   t1:r.tc_p1||0,t2:r.tc_p2||0,t3:r.tc_p3||0,
-   i1:r.inizio_p1||'',i2:r.inizio_p2||'',i3:r.inizio_p3||'',
-   f1:r.fine_p1||'',f2:r.fine_p2||'',f3:r.fine_p3||'',
-   d1:pDT(r.inizio_p1),d2:pDT(r.inizio_p2),d3:pDT(r.inizio_p3),
-   e1:pDT(r.fine_p1),e2:pDT(r.fine_p2),e3:pDT(r.fine_p3),
-  }));
+  allRows=(data||[]).map(r=>({data:r.data_inizio||'',macchina:r.macchina||'',t1:r.tc_p1||0,t2:r.tc_p2||0,t3:r.tc_p3||0,i1:r.inizio_p1||'',i2:r.inizio_p2||'',i3:r.inizio_p3||'',f1:r.fine_p1||'',f2:r.fine_p2||'',f3:r.fine_p3||'',d1:pDT(r.inizio_p1),d2:pDT(r.inizio_p2),d3:pDT(r.inizio_p3),e1:pDT(r.fine_p1),e2:pDT(r.fine_p2),e3:pDT(r.fine_p3)}));
   document.getElementById('liveDot').className='dot ok';
   document.getElementById('liveLabel').textContent='Supabase - '+allRows.length+' righe';
   document.getElementById('selFase').onchange=()=>{fase=document.getElementById('selFase').value;aggiorna();};
-  aggiorna();
-  document.getElementById('load').style.display='none';
+  aggiorna();document.getElementById('load').style.display='none';
  }catch(e){
   document.getElementById('liveDot').className='dot err';
   document.getElementById('liveLabel').textContent='ERRORE: '+e.message;
-  document.getElementById('load').innerHTML='<div class="errmsg"><p>Errore caricamento</p><p>'+e.message+'</p><p style="color:#888;font-size:12px;margin-top:10px">Verifica che la tabella "planning" esista su Supabase</p><button onclick="location.reload()" style="margin-top:15px;padding:10px 25px;background:#e94560;border:none;color:#fff;border-radius:8px;font-size:15px;cursor:pointer">Riprova</button></div>';
+  document.getElementById('load').innerHTML='<div class="errmsg"><p>Errore caricamento</p><p>'+e.message+'</p><p style="color:#888;font-size:12px;margin-top:10px">La tabella planning esiste su Supabase?</p><button onclick="location.reload()" style="margin-top:15px;padding:10px 25px;background:#e94560;border:none;color:#fff;border-radius:8px;font-size:15px;cursor:pointer">Riprova</button></div>';
  }
 }
 
-// ===== AGGIORNA =====
 function oggi(){const t=fd(new Date());return allRows.filter(r=>r.data===t)}
 function aggiorna(){
- const rows=oggi();
- document.getElementById('faseTitolo').textContent=fase;
+ const rows=oggi();document.getElementById('faseTitolo').textContent=fase;
  const done=[],prog=[],wait=[];
- rows.forEach(r=>{const s=getStatus(r,fase);if(s.st==='skip'||s.st==='noprereq')return;if(s.st==='done')done.push({row:r,data:s.data});else if(s.st==='prog')prog.push({row:r,data:s.data});else wait.push({row:r,data:s.data});});
- document.getElementById('sDone').textContent=done.length;
- document.getElementById('sProg').textContent=prog.length;
- document.getElementById('sWait').textContent=wait.length;
- let ok=0,tot=0;
- done.forEach(({row,data})=>{if(data.tc>0&&data.inizio&&data.fine){tot++;const minEff=minLavTra(data.inizio,data.fine);if(minEff!==null&&minEff<=data.tc*1.1)ok++;}});
- const elTime=document.getElementById('sTime');
- if(elTime){elTime.textContent=tot>0?Math.round(ok/tot*100)+'%':'--';elTime.className='value '+(tot>0?(ok/tot>=0.8?'green':'red'):'');}
- let caricoMin=0;
- done.forEach(({row,data})=>{caricoMin+=data.tc;});prog.forEach(({row,data})=>{caricoMin+=data.tc;});wait.forEach(({row,data})=>{caricoMin+=data.tc;});
- const caricoH=Math.floor(caricoMin/60),caricoM=caricoMin%60;
- const elCarico=document.getElementById('sCarico');
- if(elCarico)elCarico.textContent=caricoH+'h '+caricoM+'m ('+done.length+'/'+(done.length+prog.length+wait.length)+')';
- const minRes=minLavResiduiOggi(),oreRes=Math.floor(minRes/60),minResR=minRes%60;
- const minNecessari=prog.reduce((acc,{row,data})=>acc+Math.max(0,data.tc-(data.inizio?Math.max(0,(new Date()-data.inizio)/60000):0)),0)+wait.reduce((acc,{row,data})=>acc+data.tc,0);
- const elRes=document.getElementById('sResiduo');
- if(elRes){elRes.textContent=oreRes+'h '+minResR+'m';elRes.className='value '+(minRes>=minNecessari?'green':'red');elRes.title=(minRes>=minNecessari?'Tempo sufficiente: ':'TEMPO INSUFFICIENTE! Residui ')+oreRes+'h '+minResR+'m, necessari '+Math.floor(minNecessari/60)+'h '+minNecessari%60+'m';}
- const sd=document.getElementById('sdot'),st=document.getElementById('stxt');
- let html='<span class="dot ';
- if(prog.length>0){sd.className='dot yellow';html+='yellow"></span> Fase '+fase+' - IN PRODUZIONE';}
- else if(wait.length>0&&done.length>0){sd.className='dot blue';html+='blue"></span> Fase '+fase+' - '+done.length+' ok, '+wait.length+' da fare';}
- else if(wait.length>0){sd.className='dot blue';html+='blue"></span> Fase '+fase+' - In attesa';}
- else if(done.length>0){sd.className='dot green';html+='green"></span> Fase '+fase+' - Completata';}
- else{sd.className='dot red';html+='red"></span> Fase '+fase+' - Nessun dato oggi';}
- if(st)st.innerHTML=html;
- aggiornaTimer(prog);renderDone(done);renderWait(wait);
+ rows.forEach(r=>{const s=gs(r,fase);if(s.st==='skip'||s.st==='noprereq')return;if(s.st==='done')done.push({row:r,data:s.data});else if(s.st==='prog')prog.push({row:r,data:s.data});else wait.push({row:r,data:s.data});});
+ document.getElementById('sDone').textContent=done.length;document.getElementById('sProg').textContent=prog.length;document.getElementById('sWait').textContent=wait.length;
+ let ok=0,tot=0;done.forEach(({row,data})=>{if(data.tc>0&&data.inizio&&data.fine){tot++;const me=minLavTra(data.inizio,data.fine);if(me!==null&&me<=data.tc*1.1)ok++;}});
+ const et=document.getElementById('sTime');if(et){et.textContent=tot>0?Math.round(ok/tot*100)+'%':'--';et.className='value '+(tot>0?(ok/tot>=0.8?'green':'red'):'');}
+ let cm=0;done.forEach(({row,data})=>{cm+=data.tc;});prog.forEach(({row,data})=>{cm+=data.tc;});wait.forEach(({row,data})=>{cm+=data.tc;});
+ const ec=document.getElementById('sCarico');if(ec)ec.textContent=Math.floor(cm/60)+'h '+cm%60+'m ('+done.length+'/'+(done.length+prog.length+wait.length)+')';
+ const mr=minLavResiduiOggi(),or=Math.floor(mr/60),mnr=mr%60,mn=prog.reduce((a,{row,data})=>a+Math.max(0,data.tc-(data.inizio?Math.max(0,(new Date()-data.inizio)/60000):0)),0)+wait.reduce((a,{row,data})=>a+data.tc,0);
+ const er=document.getElementById('sResiduo');if(er){er.textContent=or+'h '+mnr+'m';er.className='value '+(mr>=mn?'green':'red');er.title=(mr>=mn?'Tempo sufficiente: ':'TEMPO INSUFFICIENTE! Residui ')+or+'h '+mnr+'m, necessari '+Math.floor(mn/60)+'h '+mn%60+'m';}
+ const sd=document.getElementById('sdot'),st=document.getElementById('stxt');let h='<span class="dot ';
+ if(prog.length>0){sd.className='dot yellow';h+='yellow"></span> Fase '+fase+' - IN PRODUZIONE';}else if(wait.length>0&&done.length>0){sd.className='dot blue';h+='blue"></span> Fase '+fase+' - '+done.length+' ok, '+wait.length+' da fare';}else if(wait.length>0){sd.className='dot blue';h+='blue"></span> Fase '+fase+' - In attesa';}else if(done.length>0){sd.className='dot green';h+='green"></span> Fase '+fase+' - Completata';}else{sd.className='dot red';h+='red"></span> Fase '+fase+' - Nessun dato oggi';}if(st)st.innerHTML=h;
+ timerUpd(prog);renderDone(done);renderWait(wait);
 }
 
-// ===== TIMER =====
-function aggiornaTimer(prog){
+function timerUpd(prog){
  if(timerInt){clearInterval(timerInt);timerInt=null;}
  const box=document.getElementById('tbox'),pn=document.getElementById('tpName'),pi=document.getElementById('tpInfo'),pt=document.getElementById('tpTime'),ps=document.getElementById('tpStart'),pc=document.getElementById('tpCycle'),pe=document.getElementById('tpEnd'),pd=document.getElementById('tpDelta'),bf=document.getElementById('barFill'),bl=document.getElementById('barLabel');
  if(!box||!pn)return;
  if(prog.length===0){box.className='tbox';pn.textContent='Nessun prodotto in corso per Fase '+fase;if(pi)pi.textContent='-';if(pt)pt.textContent='--:--:--';if(ps)ps.textContent='--:--';if(pc)pc.textContent='-- min';if(pe)pe.textContent='--:--';if(pd)pd.textContent='--:--';if(bf){bf.style.width='0%';bf.className='barf';}if(bl)bl.textContent='0%';return;}
- const {row,data}=prog[0];
- if(pn)pn.textContent=row.macchina;if(pi)pi.textContent='Fase '+fase+' - Tc: '+data.tc+' min';
- if(data.inizio&&ps&&pc&&pe&&pd&&bf&&bl){
-  const tc=data.tc,start=data.inizio,endExp=new Date(start.getTime()+tc*60000);
-  ps.textContent=ft(start);pc.textContent=tc+' min';pe.textContent=ft(endExp);
-  const tick=()=>{const now=new Date(),ela=(now-start)/1000,rem=(endExp-now)/1000,pct=Math.min(100,(ela/(tc*60))*100);pt.textContent=fs(ela);if(rem>=0){pd.textContent='-'+fs(rem);pd.style.color='#4ecca3';box.className='tbox ok';bf.className='barf'+(pct>85?' warn':'');}else{pd.textContent='+'+fs(-rem);pd.style.color='#e94560';box.className='tbox over';bf.className='barf over';}bf.style.width=pct+'%';bl.textContent=Math.round(pct)+'%';};
-  tick();timerInt=setInterval(tick,1000);
- }
+ const{row,data}=prog[0];if(pn)pn.textContent=row.macchina;if(pi)pi.textContent='Fase '+fase+' - Tc: '+data.tc+' min';
+ if(data.inizio&&ps&&pc&&pe&&pd&&bf&&bl){const tc=data.tc,start=data.inizio,endExp=new Date(start.getTime()+tc*60000);ps.textContent=ft(start);pc.textContent=tc+' min';pe.textContent=ft(endExp);
+ const tick=()=>{const now=new Date(),ela=(now-start)/1000,rem=(endExp-now)/1000,pct=Math.min(100,(ela/(tc*60))*100);pt.textContent=fs(ela);if(rem>=0){pd.textContent='-'+fs(rem);pd.style.color='#4ecca3';box.className='tbox ok';bf.className='barf'+(pct>85?' warn':'');}else{pd.textContent='+'+fs(-rem);pd.style.color='#e94560';box.className='tbox over';bf.className='barf over';}bf.style.width=pct+'%';bl.textContent=Math.round(pct)+'%';};tick();timerInt=setInterval(tick,1000);}
 }
 
-// ===== LISTE =====
 function renderDone(items){
- const c=document.getElementById('doneList'),cnt=document.getElementById('cDone');
- if(cnt)cnt.textContent='('+items.length+')';if(!c)return;
+ const c=document.getElementById('doneList'),cnt=document.getElementById('cDone');if(cnt)cnt.textContent='('+items.length+')';if(!c)return;
  if(items.length===0){c.innerHTML='<div class="empty"><p>Nessun completato per Fase '+fase+'</p></div>';return;}
- let h='';
- items.forEach(({row,data})=>{let delta='',cls='',durata='';if(data.fine&&data.inizio){const minEff=minLavTra(data.inizio,data.fine);if(minEff!==null){const diff=minEff-data.tc;durata=' ('+Math.floor(minEff/60)+'h '+minEff%60+'m per '+data.tc+' min Tc)';if(diff>0){delta='+'+diff+"'";cls='rosso';}else{delta=diff+"'";cls='verde';}}}h+='<div class="item" style="border-left-color:#4ecca3"><div class="mac">'+row.macchina+'</div><div class="inf">Fase '+fase+' inizio '+ft(data.inizio)+' fine '+ft(data.fine)+durata+'<br>Delta: <span class="'+cls+'">'+delta+'</span></div><div class="badge done">OK</div></div>';});
+ let h='';items.forEach(({row,data})=>{let delta='',cls='',durata='';if(data.fine&&data.inizio){const me=minLavTra(data.inizio,data.fine);if(me!==null){const diff=me-data.tc;durata=' ('+Math.floor(me/60)+'h '+me%60+'m per '+data.tc+' min Tc)';if(diff>0){delta='+'+diff+"'";cls='rosso';}else{delta=diff+"'";cls='verde';}}}h+='<div class="item" style="border-left-color:#4ecca3"><div class="mac">'+row.macchina+'</div><div class="inf">Fase '+fase+' inizio '+ft(data.inizio)+' fine '+ft(data.fine)+durata+'<br>Delta: <span class="'+cls+'">'+delta+'</span></div><div class="badge done">OK</div></div>';});
  c.innerHTML=h;
 }
 function renderWait(items){
- const c=document.getElementById('waitList'),cnt=document.getElementById('cWait');
- if(cnt)cnt.textContent='('+items.length+')';if(!c)return;
+ const c=document.getElementById('waitList'),cnt=document.getElementById('cWait');if(cnt)cnt.textContent='('+items.length+')';if(!c)return;
  if(items.length===0){c.innerHTML='<div class="empty"><p>Nessun da fare per Fase '+fase+'</p></div>';return;}
- let h='';
- items.forEach(({row,data},i)=>{let extra='';if(data.expectedStart)extra=' atteso: '+ft(data.expectedStart);const badge=i===0?'prog':'todo';const label=i===0?'Prossimo':'In coda';h+='<div class="item"><div class="mac">'+row.macchina+'</div><div class="inf">Fase '+fase+' Tc:'+data.tc+' min'+extra+'</div><div class="badge '+badge+'">'+label+'</div></div>';});
+ let h='';items.forEach(({row,data},i)=>{let ex='';if(data.expectedStart)ex=' atteso: '+ft(data.expectedStart);h+='<div class="item"><div class="mac">'+row.macchina+'</div><div class="inf">Fase '+fase+' Tc:'+data.tc+' min'+ex+'</div><div class="badge '+(i===0?'prog':'todo')+'">'+(i===0?'Prossimo':'In coda')+'</div></div>';});
  c.innerHTML=h;
 }
 
-// ===== CLOCK =====
 function clock(){const n=new Date();const el=document.getElementById('clock');if(el)el.textContent=fd(n)+' '+ftf(n)}
 setInterval(clock,1000);clock();
 document.getElementById('btnRefresh').onclick=()=>load();
